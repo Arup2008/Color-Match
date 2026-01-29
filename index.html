@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bottle Sort Puzzle — Single File</title>
+  <style>
+    /* ---- BASIC LAYOUT ---- */
+    body {
+      background-color: #000;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .screen {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .screen.visible { display: flex; }
+
+    h1 { margin-top: 20px; }
+
+    /* ---- BOARD / BOTTLES ---- */
+    .board {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      gap: 15px;
+      max-width: 92vw;
+    }
+    .bottle {
+      width: 10px;
+      height: 130px;
+      border: 1px solid rgba(211,211,211,0.5);
+      border-radius: 1px;
+      background: #111;
+      display: flex;
+      flex-direction: column-reverse;
+      justify-content: flex-start;
+      padding: 1px;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .bottle.selected {
+      transform: scale(1.03);
+      box-shadow: 0 0 12px rgba(255,255,255,0.12);
+      border-color: #ffd700;
+    }
+    .glass {
+      flex-grow: 1;
+      height: 22%;
+      margin: 3px 0;
+      border-radius: 6px 6px 8px 8px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+      transition: transform 0.12s ease;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .glass::after {
+      content: '';
+      position: absolute;
+      top: -12%;
+      left: 6%;
+      width: 88%;
+      height: 35%;
+      background: linear-gradient(to top, rgba(255,255,255,0.28), transparent);
+      transform: skewY(-6deg);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* COLORS */
+    .red{ background: linear-gradient(#ff6b6b,#ff2b2b);}
+    .blue{ background: linear-gradient(#6ba6ff,#1857ff);}
+    .green{ background: linear-gradient(#7ef0a4,#1fbf5d);}
+    .yellow{ background: linear-gradient(#fff27a,#ffd800); color:#000;}
+    .pink{ background: linear-gradient(#ffb6e6,#ff68c9); color:#000;}
+    .purple{ background: linear-gradient(#c79bff,#7a4bff);}
+    .orange{ background: linear-gradient(#ffc48a,#ff7a00);}
+    .cyan{ background: linear-gradient(#9ff0ff,#00b7e6); color:#000;}
+    .lime{ background: linear-gradient(#dfff7a,#8cff00); color:#000;}
+    .brown{ background: linear-gradient(#c69c6d,#8b5a2b);}
+    .gray{ background: linear-gradient(#d0d0d0,#8f8f8f); color:#000;}
+    .gold{ background: linear-gradient(#ffd966,#ffb300); color:#000;}
+
+    /* BUTTONS */
+    button {
+      margin: 12px 8px;
+      padding: 10px 16px;
+      font-size: 15px;
+      background-color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #startButton{ font-size: 20px; padding: 12px 28px; }
+
+    /* LEVEL SELECT */
+    .level-path {
+      display:flex;
+      flex-direction: column;
+      align-items: center;
+      background: linear-gradient(to bottom, #4b0082, #000);
+      padding: 16px;
+      border-radius: 10px;
+      width: 90%;
+      max-height: 72vh;
+      overflow-y: auto;
+    }
+    .level-node { display:flex; align-items:center; margin:8px 6px; color:#fff; }
+    .level-node.locked { opacity: 0.45; }
+    .level-node.unlocked { color: #ffd966; }
+
+    /* LEVEL COMPLETE PANEL */
+    #levelCompletePanel{
+      background: #e0e0ff;
+      border: 2px solid #4b0082;
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+      color: #000;
+      width: 320px;
+      box-shadow: 0 0 14px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    #levelCompletePanel h2{ background:#4b0082; color:#fff; margin:0; padding:10px; border-radius:6px; }
+    .stars{ font-size: 28px; margin:10px 0; }
+    .score{ font-size:16px; color:#444; margin-bottom:10px; }
+    .close-btn{ position:absolute; top:8px; right:8px; background:none; border:none; font-size:22px; cursor:pointer; }
+
+    /* LEVEL LIST POPUP */
+    #levelList {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      background: #111;
+      padding: 14px;
+      border: 2px solid white;
+      border-radius: 8px;
+      max-height: 70vh;
+      overflow-y: auto;
+      z-index: 50;
+      min-width: 200px;
+    }
+    #levelList ul{ list-style:none; padding:0; margin:0; }
+    #levelList li{ margin:6px 0; color:#fff; }
+
+    /* DOTS (optional UI) */
+    .dot-container { position: absolute; top:10px; left:50%; transform:translateX(-50%); display:flex; gap:8px; }
+    .dot{ width:10px; height:10px; background:#666; border-radius:50%; }
+    .dot.active{ background:#fff; }
+
+    /* responsive */
+    @media (max-width:480px){
+      .bottle{ width:46px; height:150px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HOME -->
+  <div id="homeScreen" class="screen visible">
+    <h1>Color Match</h1>
+    <button id="startButton" onclick="showLevelSelect()">Start Game</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="gameScreen" class="screen">
+    <div id="levelInfo">Level: 1</div>
+    <div class="board" id="board"></div>
+
+    <div style="margin-top:14px;">
+      <button id="refresh" onclick="refreshLevel()">refresh</button>
+      <button id="undo" onclick="undoMove()">undo</button>
+      <button onclick="showLevelList()">completed</button>
+    </div>
+  </div>
+
+  <!-- LEVEL SELECT -->
+  <div id="levelSelectScreen" class="screen">
+    <h1>Level Select</h1>
+    <div class="level-path" id="levelPath"></div>
+    <button id="closeLevelSelect" onclick="hideLevelSelect()">Close</button>
+  </div>
+
+  <!-- LEVEL COMPLETE -->
+  <div id="levelCompleteScreen" class="screen">
+    <div id="levelCompletePanel">
+      <button class="close-btn" onclick="hideLevelComplete()">×</button>
+      <h2 id="completeLevel">Level 1</h2>
+      <div class="stars" id="starDisplay">⭐⭐⭐</div>
+      <div class="score" id="scoreDisplay">SCORE 0</div>
+      <div style="margin-top:10px;">
+        <button class="restart-btn" onclick="restartLevel()">↻</button>
+        <button class="next-btn" id="nextLevelBtn" onclick="nextLevel()">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEVEL LIST POPUP -->
+  <div id="levelList">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <strong>Completed Levels</strong>
+      <button id="closeList" onclick="hideLevelList()">Close</button>
+    </div>
+    <ul id="levelListContent"></ul>
+  </div>
+
+  <script>
+    /* ----------------------
+       Game state & config
+       ---------------------- */
+    const allColors = ['red','blue','green','yellow','pink','purple','orange','cyan','lime','brown','gray','gold'];
+    const glassPerBottle = 4;
+
+    let bottles = [];            // array of arrays (each bottle is array of colors bottom-to-top)
+    let selectedBottle = null;   // index selected
+    let level = 1;
+    let completedLevels = JSON.parse(localStorage.getItem('completedLevels')) || [];
+    let score = 0;
+    let moveHistory = [];        // undo stack: {from, to, colors: [...], prevScore}
+
+    /* ----------------------
+       SCREEN MANAGEMENT
+       ---------------------- */
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+      document.getElementById(id).classList.add('visible');
+    }
+
+    function showLevelSelect(){
+      renderLevelPath();
+      showScreen('levelSelectScreen');
+    }
+    function hideLevelSelect(){
+      showScreen('homeScreen');
+    }
+
+    function startGame(){
+      // show game screen and init level
+      showScreen('gameScreen');
+      createGame(level);
+    }
+
+    function showLevelComplete(){
+      showScreen('levelCompleteScreen');
+      document.getElementById('completeLevel').textContent = `Level ${level}`;
+      const stars = Math.min(Math.floor(score / 300), 3) || 1;
+      document.getElementById('starDisplay').textContent = '⭐'.repeat(stars);
+      document.getElementById('scoreDisplay').textContent = `SCORE ${score}`;
+      document.getElementById('nextLevelBtn').disabled = level >= 1000;
+    }
+    function hideLevelComplete(){
+      showScreen('gameScreen');
+    }
+
+    /* ----------------------
+       LEVEL PATH / SELECT
+       ---------------------- */
+    function renderLevelPath(){
+      const levelPath = document.getElementById('levelPath');
+      levelPath.innerHTML = '';
+      const maxLevels = 1000; // keep reasonable for DOM; change if you want
+      for (let i = 1; i <= maxLevels; i++){
+        const node = document.createElement('div');
+        node.className = 'level-node ' + (completedLevels.includes(i) ? 'unlocked' : 'locked');
+        node.innerHTML = `<span style="width:40px;display:inline-block;text-align:center">${i}</span>`;
+        if (!completedLevels.includes(i)){
+          node.innerHTML += '<span style="margin-left:10px">🔒</span>';
+        } else {
+          node.innerHTML += '<span style="margin-left:10px">⭐</span>';
+        }
+        node.onclick = () => {
+          if (completedLevels.includes(i) || i === 1 || completedLevels.includes(i-1)){
+            level = i;
+            startGame();
+          } else {
+            alert('এই লেভেল আনলক হয়নি। প্রথমে আগের লেভেলগুলো ক্লিয়ার করুন।');
+          }
+        };
+        levelPath.appendChild(node);
+      }
+    }
+
+    /* ----------------------
+       GAME CREATION & RENDER
+       ---------------------- */
+    function createGame(lv){
+      // reset states
+      moveHistory = [];
+      selectedBottle = null;
+      score = 0;
+
+      bottles = [];
+      const colorCount = Math.min(2 + Math.floor(lv / 2), allColors.length);
+      const totalBottles = colorCount + 2; // common puzzle formula
+      let liquid = [];
+
+      // prepare liquids (each color repeated glassPerBottle times)
+      allColors.slice(0, colorCount).forEach(color => {
+        for (let i = 0; i < glassPerBottle; i++) liquid.push(color);
+      });
+      shuffle(liquid);
+
+      // create bottles and fill sequentially (bottom->top push)
+      for (let i = 0; i < totalBottles; i++){
+        const b = [];
+        for (let j = 0; j < glassPerBottle; j++){
+          const c = liquid.pop();
+          if (c) b.push(c);
+        }
+        bottles.push(b);
+      }
+
+      document.getElementById('levelInfo').textContent = `Level: ${lv}`;
+      render();
+    }
+
+    function render(){
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      bottles.forEach((bottle, index) => {
+        const div = document.createElement('div');
+        div.className = 'bottle' + (selectedBottle === index ? ' selected' : '');
+        div.onclick = () => handleClick(index);
+
+        // show 4 glass slots (bottom-to-top)
+        for (let i = 0; i < glassPerBottle; i++){
+          const g = document.createElement('div');
+          g.className = 'glass';
+          const color = bottle[i];
+          if (color) g.classList.add(color);
+          div.appendChild(g);
+        }
+        // label index small
+        const idxLabel = document.createElement('div');
+        idxLabel.style.fontSize = '12px';
+        idxLabel.style.marginTop = '6px';
+        idxLabel.style.color = '#ccc';
+        idxLabel.textContent = index + 1;
+        div.appendChild(idxLabel);
+
+        board.appendChild(div);
+      });
+    }
+
+    /* ----------------------
+       CLICK & MOVE LOGIC
+       ---------------------- */
+    function handleClick(index){
+      if (selectedBottle === null){
+        if (bottles[index].length === 0) {
+          // nothing to pick
+          return;
+        }
+        selectedBottle = index;
+      } else {
+        if (selectedBottle === index){
+          // deselect
+          selectedBottle = null;
+          render();
+          return;
+        }
+        // attempt move
+        moveLiquid(selectedBottle, index);
+        selectedBottle = null;
+      }
+      render();
+    }
+
+    function moveLiquid(from, to){
+      const fromBottle = bottles[from];
+      const toBottle = bottles[to];
+
+      if (!fromBottle.length) return;
+      if (toBottle.length >= glassPerBottle) return;
+
+      const movingColor = fromBottle[fromBottle.length - 1];
+
+      // count contiguous same-color on top of fromBottle
+      let count = 0;
+      for (let i = fromBottle.length - 1; i >= 0; i--){
+        if (fromBottle[i] === movingColor) count++;
+        else break;
+      }
+
+      let space = glassPerBottle - toBottle.length;
+      if (space === 0) return;
+      if (toBottle.length > 0 && toBottle[toBottle.length -1] !== movingColor) return;
+
+      const movedColors = [];
+      let moved = 0;
+      const prevScore = score;
+
+      while (moved < count && space > 0){
+        const c = fromBottle.pop();
+        toBottle.push(c);
+        movedColors.push(c);
+        moved++;
+        space--;
+        score += 10;
+      }
+
+      if (movedColors.length > 0){
+        moveHistory.push({ from, to, colors: movedColors, prevScore });
+      }
+
+      render();
+      checkLevelComplete();
+    }
+
+    /* ----------------------
+       UNDO
+       ---------------------- */
+    function undoMove(){
+      if (moveHistory.length === 0) return;
+      const last = moveHistory.pop();
+      const { from, to, colors, prevScore } = last;
+
+      // pop back same count from 'to' and push into 'from'
+      for (let i = 0; i < colors.length; i++){
+        const c = bottles[to].pop();
+        if (c === undefined) break; // safety
+        bottles[from].push(c);
+      }
+      score = prevScore; // restore previous score
+      render();
+    }
+
+    /* ----------------------
+       REFRESH (partial shuffle)
+       - keep fully-uniform bottles unchanged
+       - collect liquids from other bottles, shuffle and redistribute
+       ---------------------- */
+    function refreshLevel(){
+      // collect liquids from changeable bottles and clear them
+      const lockedIndices = new Set();
+      let changeableLiquids = [];
+
+      bottles.forEach((bottle, idx) => {
+        if (bottle.length === glassPerBottle && bottle.every(c => c === bottle[0])){
+          // locked - keep as is
+          lockedIndices.add(idx);
+        } else {
+          // collect liquids and empty bottle
+          changeableLiquids.push(...bottle);
+          bottles[idx] = [];
+        }
+      });
+
+      // shuffle the collected liquids
+      shuffle(changeableLiquids);
+
+      // redistribute into non-locked bottles in order (fill to capacity)
+      for (let idx = 0; idx < bottles.length; idx++){
+        if (lockedIndices.has(idx)) continue;
+        for (let s = 0; s < glassPerBottle && changeableLiquids.length > 0; s++){
+          bottles[idx].push(changeableLiquids.pop());
+        }
+      }
+
+      // clear undo history (because structure changed)
+      moveHistory = [];
+      render();
+    }
+
+    /* ----------------------
+       CHECK COMPLETE
+       ---------------------- */
+    function checkLevelComplete(){
+      const completed = bottles.every(bottle => {
+        return bottle.length === 0 || (bottle.length === glassPerBottle && bottle.every(c => c === bottle[0]));
+      });
+
+      if (completed){
+        if (!completedLevels.includes(level)){
+          completedLevels.push(level);
+          localStorage.setItem('completedLevels', JSON.stringify(completedLevels));
+        }
+        showLevelComplete();
+      }
+    }
+
+    /* ----------------------
+       RESTART / NEXT LEVEL
+       ---------------------- */
+    function restartLevel(){
+      moveHistory = [];
+      createGame(level);
+    }
+
+    function nextLevel(){
+      if (level < 1000){
+        level++;
+        restartLevel();
+        showScreen('gameScreen');
+      } else {
+        alert("🎉 You've reached the final level!");
+      }
+    }
+
+    /* ----------------------
+       LEVEL LIST POPUP
+       ---------------------- */
+    function showLevelList(){
+      const ul = document.getElementById('levelListContent');
+      ul.innerHTML = '';
+      if (!completedLevels.length){
+        const li = document.createElement('li');
+        li.textContent = 'কোনো লেভেল সম্পন্ন হয়নি।';
+        ul.appendChild(li);
+      } else {
+        completedLevels.forEach(lv => {
+          const li = document.createElement('li');
+          li.textContent = `Level ${lv}`;
+          ul.appendChild(li);
+        });
+      }
+      document.getElementById('levelList').style.display = 'block';
+    }
+    function hideLevelList(){
+      document.getElementById('levelList').style.display = 'none';
+    }
+
+    /* ----------------------
+       UTILITIES
+       ---------------------- */
+    function shuffle(arr){
+      for (let i = arr.length -1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    /* ----------------------
+       INITIAL SETUP
+       ---------------------- */
+    // ensure correct initial screen visibility
+    window.addEventListener('load', () => {
+      // homeScreen visible already by class; others hidden.
+      // (Optionally) pre-render levelPath so Start->Select is fast
+      renderLevelPath();
+    });
+  </script>
+</body>
+</html>
